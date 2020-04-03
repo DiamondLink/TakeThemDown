@@ -9,7 +9,4 @@ Here are the features that will be implemented:
 - Several DDos methods support : - Amplification attack
                                  - Slow and low attack
                                  - Synflood attack
-                                 - And many more
-
-- Requirement : > python3.x
-                > python-masscan module
+                                 - and many more
