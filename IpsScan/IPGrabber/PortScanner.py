@@ -1,48 +1,44 @@
 # This script runs on Python 3
-import socket, threading
+import socket, threading, sys, os, time, socket
+sys.path.append(os.path.join(sys.path[0],'..','..','baseFunctions'))
+from functions import *
+
+class SinglePortScan(threading.Thread):
+    @auto_assign
+    def __init__(self,ip,port,timeout):
+        threading.Thread.__init__(self)
+        self.isOpen = None
+    
+    def run(self):
+
+        self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        #self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) idrk what this does
+        self.sock.settimeout(self.timeout)
+
+        try:
+            self.sock.connect((self.ip,self.port))
+            self.isOpen = True
+        except socket.timeout:
+            pass
+
+def IpRangedPortScan(ip : str,portRange : list,threadPerSecond : int,timeout : float):#setting threadPerSecond to 0 won't do a thread limit NOT RECOMMENDED
+    """scan ips for open ports. Port range must a list with start port and end port. Setting threadPerSecond to 0 won't do a thread limit NOT RECOMMENDED"""
+    openPorts = list()
+    portScanThreads = list()
+    for ports in range(portRange[0],portRange[1]):
+        portScanThreads.append(SinglePortScan(ip,ports,timeout))
+
+    for threads in portScanThreads:
+        threads.start()
+        if threadPerSecond != 0:    #NOT RECOMMANDED
+            time.sleep(1/threadPerSecond)
+
+    for threads in portScanThreads:
+        threads.join()
 
 
-def TCP_connect(ip, port_number, delay, output):
-    TCPsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    TCPsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    TCPsock.settimeout(delay)
-    try:
-        TCPsock.connect((ip, port_number))
-        output[port_number] = 'Listening'
-    except:
-        output[port_number] = ''
+    for threads in portScanThreads:
+        if threads.isOpen == True:
+            openPorts.append(threads.port)
 
-
-
-def scan_ports(host_ip, delay):
-
-    threads = []        # To run TCP_connect concurrently
-    output = {}         # For printing purposes
-
-    # Spawning threads to scan ports
-    for i in range(10000):
-        t = threading.Thread(target=TCP_connect, args=(host_ip, i, delay, output))
-        threads.append(t)
-
-    # Starting threads
-    for i in range(10000):
-        threads[i].start()
-
-    # Locking the main thread until all threads complete
-    for i in range(10000):
-        threads[i].join()
-
-    # Printing listening ports from small to large
-    for i in range(10000):
-        if output[i] == 'Listening':
-            print(str(i) + ': ' + output[i])
-
-
-
-def main():
-    host_ip = input("Enter host IP: ")
-    delay = int(input("How many seconds the socket is going to wait until timeout: "))   
-    scan_ports(host_ip, delay)
-
-if __name__ == "__main__":
-    main()
+    return openPorts
