@@ -10,3 +10,6 @@ Here are the features that will be implemented:
                                  - Slow and low attack
                                  - Synflood attack
                                  - And many more
+
+- Requirement : > python3.x
+                > python-masscan module
