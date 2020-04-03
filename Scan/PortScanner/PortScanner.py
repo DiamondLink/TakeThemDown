@@ -21,8 +21,8 @@ class SinglePortScan(threading.Thread):
         except socket.timeout:
             pass
 
-def IpRangedPortScan(ip : str,portRange : list,threadPerSecond : int,timeout : float):#setting threadPerSecond to 0 won't do a thread limit NOT RECOMMENDED
-    """scan ips for open ports. Port range must a list with start port and end port. Setting threadPerSecond to 0 won't do a thread limit NOT RECOMMENDED"""
+def IpRangedPortScan(ip : str,portRange : list,threadPerSecond : int,timeout : float):#setting threadPerSecond to 0 won't do a thread limit
+    """scan ips for open ports. Port range must a list with start port and end port. Setting threadPerSecond to 0 won't do a thread limit"""
     openPorts = list()
     portScanThreads = list()
     for ports in range(portRange[0],portRange[1]):
@@ -30,7 +30,7 @@ def IpRangedPortScan(ip : str,portRange : list,threadPerSecond : int,timeout : f
 
     for threads in portScanThreads:
         threads.start()
-        if threadPerSecond != 0:    #NOT RECOMMANDED
+        if threadPerSecond != 0:
             time.sleep(1/threadPerSecond)
 
     for threads in portScanThreads:
