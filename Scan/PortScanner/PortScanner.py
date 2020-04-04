@@ -14,7 +14,7 @@ class SinglePortScan(threading.Thread):
         if protocol == "TCP":
             self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         elif protocol == "UDP":
-            self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) #THIS NEED TO BE FIXED
         #self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) idrk what this does
         self.sock.settimeout(self.timeout)
 
