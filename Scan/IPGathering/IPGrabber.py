@@ -1,75 +1,109 @@
-import socket, threading, sys, os, time, struct
+import socket, sys, os, time, struct, threading
+from multiprocessing import Process,Manager
+from multiprocessing.managers import BaseManager
+from pysnmp.entity.rfc3413.oneliner import cmdgen
+#from scapy.all import *
+#import subprocess
+#import pandas
+
 sys.path.append(os.path.join(sys.path[0],'..','..','baseFunctions'))
 from functions import *
 
-class IpsCalculator:
+class IpsCalculator(threading.Thread):
     @auto_assign
-    def __init__(self,startIp):
+    def __init__(self,startIp,endIp):
+        threading.Thread.__init__(self)
 
-        self.startIp = struct.unpack('>I', socket.inet_aton(self.startIp))[0]
         self.incrementation = self.startIp
         self.lock = threading.Lock()
+        self.ips = dict()
 
-    def generateNewIp(self):
+    def generateAndGetNewIp(self):
         self.lock.acquire()
         self.newIp = socket.inet_ntoa(struct.pack('>I', self.incrementation))
         self.incrementation += 1
+        return self.newIp
         self.lock.release()
 
 
-
-class SingleIPScan(threading.Thread):
+class SingleIPScan(Process):
     @auto_assign
-    def __init__(self,port,timeout):
-        threading.Thread.__init__(self)
+    def __init__(self,port,protocol,timeout,id,IpClass):
+        super(SingleIPScan, self).__init__()
+
         self.discoveredThePortOnTheIp = None
 
     def run(self):
+        self.ip = self.IpClass.generateAndGetNewIp()
 
-        self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        if self.protocol == "TCP":
+            self.discoveredThePortOnTheIp = tcpScan(self.ip,self.port,self.timeout)
+
+        elif self.protocol == "UDP":
+            self.discoveredThePortOnTheIp = udpScan(self.ip,self.port,self.timeout,2)
+
+def tcpScan(ip,port,timeout):
+    try:
+        sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         #self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) idrk what this does
-        self.sock.settimeout(self.timeout)
+        sock.settimeout(timeout)
+        sock.connect((ip,port))
+        return True
+    except socket.timeout:
+        return False
 
-        ipsCalculator.generateNewIp()
-        self.ip = ipsCalculator.newIp
-        try:
-            self.sock.connect((self.ip,self.port))
-            self.discoveredThePortOnTheIp = True
-            print(self.ip)
-        except socket.timeout:
-            pass
+def udpScan(ip,port,timeout,retries):
+    cmdGen = cmdgen.CommandGenerator()
+    community_string = "public"
+    authentication_token = cmdgen.CommunityData(community_string, mpModel = 0)
 
+    errorIndication, errorStatus, errorIndex, varBinds = cmdGen.getCmd(
+		authentication_token,
+		cmdgen.UdpTransportTarget((ip, port), timeout = timeout, retries = retries),
+		cmdgen.MibVariable('SNMPv2-MIB', 'sysDescr', 0)
+	)
 
-def IPGrabber(ipRange : list,port : int,threadPerSecond : int,timeout : float):
-    global ipsCalculator
+    if errorIndication:
+        return False
+    elif errorStatus:
+        return False
+    else:
+        return True
 
-    ipsCalculator = IpsCalculator(ipRange[0])
+def IPGrabber(ipRange : list,port : int,protocol : str,threadPerSecond : int,timeout : float):
+
+    ipsDiscoveredPort = list()
 
     ipScanThreads = list()
-    ipsDiscoveredPort = list()
 
     startIpNumber = struct.unpack('>I', socket.inet_aton(ipRange[0]))[0]
     endIpNumber = struct.unpack('>I', socket.inet_aton(ipRange[1]))[0]
 
-    for i in range(endIpNumber - startIpNumber):
-        ipScanThreads.append(SingleIPScan(port,timeout))
+    BaseManager.register("IpsCalculator", IpsCalculator)
+    manager = BaseManager()
+    manager.start()
+    ipsCalculator = manager.IpsCalculator(startIpNumber,endIpNumber)
+
+    ipScanThreads = [SingleIPScan(port,protocol,timeout,i,ipsCalculator) for i in range(endIpNumber - startIpNumber)]
     
-    for threads in ipScanThreads:
-        threads.start()
-        if threadPerSecond != 0:
-            time.sleep(1/threadPerSecond)
-    
-    for threads in ipScanThreads:
-        threads.join()
-    
-    for threads in ipScanThreads:
-        if threads.discoveredThePortOnTheIp:
-            ipsDiscoveredPort.append(threads.ip)
+    for processes in ipScanThreads : processes.start()
+
+    for processes in ipScanThreads : processes.join()
+
+    ipsDiscoveredPort = [processes.ip for processes in ipScanThreads if processes.discoveredThePortOnTheIp]
     
     return ipsDiscoveredPort
 
-
 if __name__ == "__main__":
-
-    print(IPGrabber(["18.21.248.85","18.21.248.91"],80,100,1))
+    a = 0
+    startTime = time.time()
+    if a == 1:
+        startTime = time.time()
+        ipRange = input("ip range : ")
+        port = int(input("port : "))
+        protocol = input("protocol (TCP/UDP): ")
+        threadPerSecond = int(input("threads per second (0 for no limit) : "))
+        timeout = float(input("timeout : "))
+    print(IPGrabber(["12.86.249.200","12.86.249.255"],161,"UDP",0,1))
+    print("Done ! Scanned in {} s".format(time.time() - startTime))
 
